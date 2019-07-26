@@ -47,6 +47,7 @@ class SelfAttentionEncoder(Encoder):
     dim = tf.shape(inputs)[-1]
     inputs, ldr_inputs = tf.split(value=inputs, num_or_size_splits=[self.num_units, dim - self.num_units], axis=-1)
     inputs *= self.num_units**0.5
+    print("inputs",inputs)
     if self.position_encoder is not None:
       inputs = self.position_encoder(inputs)
 
