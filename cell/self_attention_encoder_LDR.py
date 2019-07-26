@@ -56,7 +56,7 @@ class SelfAttentionEncoder(Encoder):
         inputs,
         rate=self.dropout,
         training=mode == tf.estimator.ModeKeys.TRAIN)
-    inputs = inputs + tf.layers.dense(ldr_inputs, self.num_units)
+    inputs = inputs + tf.layers.dense(ldr_inputs, self.num_units, name="ldr_layer_0")
 
     mask = transformer.build_sequence_mask(
         sequence_length,
@@ -94,7 +94,7 @@ class SelfAttentionEncoder(Encoder):
               dropout=self.dropout)
 
         inputs = transformed
-        inputs = inputs + tf.layers.dense(ldr_inputs, self.num_units)
+        inputs = inputs + tf.layers.dense(ldr_inputs, self.num_units, name="ldr_layer_%d"%l)
         state += (tf.reduce_mean(inputs, axis=1),)
 
     outputs = transformer.norm(inputs)

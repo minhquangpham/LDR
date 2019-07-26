@@ -106,7 +106,7 @@ class SelfAttentionDecoder(decoder.Decoder):
         rate=self.dropout,
         training=mode == tf.estimator.ModeKeys.TRAIN)
 
-    inputs = inputs + tf.layers.dense(ldr_inputs, self.num_units)
+    inputs = inputs + tf.layers.dense(ldr_inputs, self.num_units, name="ldr_layer_0")
 
     decoder_mask = None
     memory_mask = None
@@ -205,7 +205,7 @@ class SelfAttentionDecoder(decoder.Decoder):
               dropout=self.dropout)
 
         inputs = transformed
-        inputs = inputs + tf.layers.dense(ldr_inputs, self.num_units)
+        inputs = inputs + tf.layers.dense(ldr_inputs, self.num_units, name="ldr_layer_%d"%l)
 
     if last_attention is not None:
       # The first head of the last layer is returned.
