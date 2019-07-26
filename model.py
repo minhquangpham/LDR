@@ -209,7 +209,7 @@ class Model:
                                                                                    label_smoothing=params.get("label_smoothing", 0.0),
                                                                                    average_in_time=params.get("average_loss_in_time", True),
                                                                                    mode=mode)
-            print("loss_generic", loss_generic)
+            print("logits_generic", logits_generic)
             print("tgt_ids_batch", tgt_ids_batch)
             loss_domain, _, _                                    = cross_entropy_sequence_loss(logits_domain,
                                                                                    tgt_ids_batch, 
