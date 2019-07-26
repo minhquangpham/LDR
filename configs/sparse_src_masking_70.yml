@@ -1,4 +1,4 @@
-model_dir: /mnt/beegfs/home/pham/multi-domain-nmt/meta_sparse/models/sparse_src_masking_70
+model_dir: /mnt/beegfs/home/pham/multi-domain-nmt/LDR/models/sparse_src_masking_70
 
 domain_numb: 6
 
@@ -83,7 +83,7 @@ label_smoothing: 0.1
 beam_width: 5
 length_penalty: 0.6
 
-num_devices: 2
+num_devices: 1
 num_threads: 5
 
 daisy_chain_variables: false
@@ -96,7 +96,7 @@ example_sampling_distribution: Natural
 
 dataprocess_version: 1
 
-training_batch_size: 3072
+training_batch_size: 1536
 
 eval_batch_size: 120
 
@@ -104,11 +104,7 @@ max_len: 80
 
 Standard: true
 position_mask: false
-Fusion_layer: true
-generic_batch: true
 projector_masking: false
-src_masking: true
-tgt_masking: false
 Generic_region_adversarial_training: false
 src_adv_training: false
 tgt_adv_training: false
