@@ -456,8 +456,8 @@ class Model:
 
         elif config["Architecture"] == "Transformer":
             nlayers = config.get("nlayers",6)
-            decoder = self_attention_decoder_LDR(nlayers, num_units=hidden_size, num_heads=8, ffn_inner_dim=2048, dropout=0.1, attention_dropout=0.1, relu_dropout=0.1)
-            encoder = self_attention_encoder_LDR(nlayers, num_units=hidden_size, num_heads=8, ffn_inner_dim=2048, dropout=0.1, attention_dropout=0.1, relu_dropout=0.1)
+            decoder = self_attention_decoder_LDR.SelfAttentionDecoder(nlayers, num_units=hidden_size, num_heads=8, ffn_inner_dim=2048, dropout=0.1, attention_dropout=0.1, relu_dropout=0.1)
+            encoder = self_attention_encoder_LDR.SelfAttentionEncoder(nlayers, num_units=hidden_size, num_heads=8, ffn_inner_dim=2048, dropout=0.1, attention_dropout=0.1, relu_dropout=0.1)
 
         print("Model type: ", config["Architecture"])
 

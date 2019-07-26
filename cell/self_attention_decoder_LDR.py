@@ -7,7 +7,7 @@ from opennmt.layers import transformer
 from opennmt.layers.position import SinusoidalPositionEncoder
 
 
-class SelfAttentionDecoderLDR(decoder.Decoder):
+class SelfAttentionDecoder(decoder.Decoder):
   
   def __init__(self,
                num_layers,
