@@ -44,7 +44,8 @@ class SelfAttentionEncoder(Encoder):
     self.position_encoder = position_encoder
 
   def encode(self, inputs, sequence_length=None, mode=tf.estimator.ModeKeys.TRAIN):
-    dim = tf.shape(inputs)[-1]
+    dim = inputs.get_shape()[-1]
+    print("total dim", dim)
     inputs, ldr_inputs = tf.split(value=inputs, num_or_size_splits=[self.num_units, dim - self.num_units], axis=-1)
     inputs *= self.num_units**0.5
     print("inputs",inputs)
