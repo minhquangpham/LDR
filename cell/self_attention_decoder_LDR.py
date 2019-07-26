@@ -7,11 +7,8 @@ from opennmt.layers import transformer
 from opennmt.layers.position import SinusoidalPositionEncoder
 
 
-class SelfAttentionDecoder(decoder.Decoder):
-  """Decoder using self-attention as described in
-  https://arxiv.org/abs/1706.03762.
-  """
-
+class SelfAttentionDecoderLDR(decoder.Decoder):
+  
   def __init__(self,
                num_layers,
                num_units=512,
@@ -91,21 +88,25 @@ class SelfAttentionDecoder(decoder.Decoder):
     return cache
 
   def _self_attention_stack(self,
-                            inputs,
+                            inputs,                            
                             sequence_length=None,
                             mode=tf.estimator.ModeKeys.TRAIN,
                             cache=None,
                             memory=None,
                             memory_sequence_length=None,
                             step=None):
+    dim = tf.shape(inputs)
+    inputs, ldr_inputs = tf.split(value=inputs, num_or_size_splits=[self.num_units, dim - self.num_units], axis=-1)                            
     inputs *= self.num_units**0.5
     if self.position_encoder is not None:
       inputs = self.position_encoder(inputs, position=step + 1 if step is not None else None)
-
+    
     inputs = tf.layers.dropout(
         inputs,
         rate=self.dropout,
         training=mode == tf.estimator.ModeKeys.TRAIN)
+
+    inputs = inputs + tf.layers.dense(ldr_inputs, self.num_units)
 
     decoder_mask = None
     memory_mask = None
@@ -204,6 +205,7 @@ class SelfAttentionDecoder(decoder.Decoder):
               dropout=self.dropout)
 
         inputs = transformed
+        inputs = inputs + tf.layers.dense(ldr_inputs, self.num_units)
 
     if last_attention is not None:
       # The first head of the last layer is returned.
@@ -215,7 +217,7 @@ class SelfAttentionDecoder(decoder.Decoder):
     return outputs, first_head_attention
 
   def decode_from_inputs(self,
-                         inputs,
+                         inputs,                         
                          sequence_length,
                          initial_state=None,
                          mode=tf.estimator.ModeKeys.TRAIN,

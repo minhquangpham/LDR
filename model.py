@@ -36,6 +36,8 @@ from tensorflow.python.ops import nn_ops
 from tensorflow.python.ops import standard_ops
 from tensorflow.python.util.tf_export import tf_export
 import cell.rnn_decoder as rnn_decoder
+import cell.self_attention_decoder_LDR as self_attention_decoder_LDR
+import cell.self_attention_encoder_LDR as self_attention_encoder_LDR
 
 class MyDenseLayer(Layer):
   def __init__(self,
@@ -174,7 +176,7 @@ def create_mask(domain_numb, domain_region_size):
     mask_.append(tf.ones(shape=(1,sum(domain_region_size))))
     return tf.squeeze(tf.concat(mask_,0))
 
-def make_batch(emb_domain, emb_generic, dom_fusion_layer, gen_fusion_layer, mask_, inputs_domain, inputs_ids):
+def make_batch(emb_domain, emb_generic, mask_, inputs_domain, inputs_ids):
     mask = tf.nn.embedding_lookup(mask_, inputs_domain)
     #mask = tf.Print(mask,[mask[:5,:]], message="src_mask_batch: ", first_n=3, summarize=100)
     mask = tf.expand_dims(mask,1)
@@ -184,8 +186,8 @@ def make_batch(emb_domain, emb_generic, dom_fusion_layer, gen_fusion_layer, mask
     emb_domain_batch = tf.multiply(emb_domain_batch, mask)
     emb_domain_batch = tf.Print(emb_domain_batch,[emb_domain_batch[:5,:]], message="emb_domain_batch: ", first_n=3, summarize=100)
     #emb_generic_batch = gen_fusion_layer(emb_generic_batch)
-    emb_domain_batch = dom_fusion_layer(emb_domain_batch)
-    return emb_generic_batch + emb_domain_batch
+    #emb_domain_batch = dom_fusion_layer(emb_domain_batch)
+    return tf.concat([emb_generic_batch, emb_domain_batch],-1)
 
 def extend_embeddings(vocab_size, dom_numb, old_emb):
     depth = tf.shape(old_emb)[-1]/dom_numb
@@ -454,8 +456,9 @@ class Model:
 
         elif config["Architecture"] == "Transformer":
             nlayers = config.get("nlayers",6)
-            decoder = onmt.decoders.self_attention_decoder.SelfAttentionDecoder(nlayers, num_units=hidden_size, num_heads=8, ffn_inner_dim=2048, dropout=0.1, attention_dropout=0.1, relu_dropout=0.1)
-            encoder = onmt.encoders.self_attention_encoder.SelfAttentionEncoder(nlayers, num_units=hidden_size, num_heads=8, ffn_inner_dim=2048, dropout=0.1, attention_dropout=0.1, relu_dropout=0.1)       
+            decoder = self_attention_decoder_LDR(nlayers, num_units=hidden_size, num_heads=8, ffn_inner_dim=2048, dropout=0.1, attention_dropout=0.1, relu_dropout=0.1)
+            encoder = self_attention_encoder_LDR(nlayers, num_units=hidden_size, num_heads=8, ffn_inner_dim=2048, dropout=0.1, attention_dropout=0.1, relu_dropout=0.1)
+
         print("Model type: ", config["Architecture"])
 
         if mode =="Training":            
@@ -465,8 +468,8 @@ class Model:
 
         start_tokens = tf.fill([tf.shape(inputs["src_ids"])[0]], constants.START_OF_SENTENCE_ID)   
         generic_domain = tf.fill(tf.shape(inputs["domain"]), config["domain_numb"])
-        emb_src_batch_domain = make_batch(src_emb_domain, src_emb_generic, src_dom_fusion_layer, src_gen_fusion_layer, src_mask_, inputs["domain"], inputs["src_ids"])
-        emb_src_batch_generic = make_batch(src_emb_domain, src_emb_generic, src_dom_fusion_layer, src_gen_fusion_layer, src_mask_, generic_domain, inputs["src_ids"])                     
+        emb_src_batch_domain = make_batch(src_emb_domain, src_emb_generic, src_mask_, inputs["domain"], inputs["src_ids"])
+        emb_src_batch_generic = make_batch(src_emb_domain, src_emb_generic, src_mask_, generic_domain, inputs["src_ids"])                     
 
         if mode=="Training":
             emb_tgt_batch = tf.nn.embedding_lookup(tgt_emb, inputs["tgt_ids_in"])    

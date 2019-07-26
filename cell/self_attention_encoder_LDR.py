@@ -9,10 +9,7 @@ from opennmt.layers.position import SinusoidalPositionEncoder
 
 
 class SelfAttentionEncoder(Encoder):
-  """Encoder using self-attention as described in
-  https://arxiv.org/abs/1706.03762.
-  """
-
+  
   def __init__(self,
                num_layers,
                num_units=512,
@@ -47,6 +44,8 @@ class SelfAttentionEncoder(Encoder):
     self.position_encoder = position_encoder
 
   def encode(self, inputs, sequence_length=None, mode=tf.estimator.ModeKeys.TRAIN):
+    dim = tf.shape(inputs)
+    inputs, ldr_inputs = tf.split(value=inputs, num_or_size_splits=[self.num_units, dim - self.num_units], axis=-1)
     inputs *= self.num_units**0.5
     if self.position_encoder is not None:
       inputs = self.position_encoder(inputs)
@@ -55,6 +54,8 @@ class SelfAttentionEncoder(Encoder):
         inputs,
         rate=self.dropout,
         training=mode == tf.estimator.ModeKeys.TRAIN)
+    inputs = inputs + tf.layers.dense(ldr_inputs, self.num_units)
+
     mask = transformer.build_sequence_mask(
         sequence_length,
         num_heads=self.num_heads,
@@ -91,6 +92,7 @@ class SelfAttentionEncoder(Encoder):
               dropout=self.dropout)
 
         inputs = transformed
+        inputs = inputs + tf.layers.dense(ldr_inputs, self.num_units)
         state += (tf.reduce_mean(inputs, axis=1),)
 
     outputs = transformer.norm(inputs)
