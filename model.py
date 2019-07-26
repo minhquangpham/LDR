@@ -177,16 +177,13 @@ def create_mask(domain_numb, domain_region_size):
     return tf.squeeze(tf.concat(mask_,0))
 
 def make_batch(emb_domain, emb_generic, mask_, inputs_domain, inputs_ids):
-    mask = tf.nn.embedding_lookup(mask_, inputs_domain)
-    #mask = tf.Print(mask,[mask[:5,:]], message="src_mask_batch: ", first_n=3, summarize=100)
+    mask = tf.nn.embedding_lookup(mask_, inputs_domain)    
     mask = tf.expand_dims(mask,1)
     emb_generic_batch = tf.nn.embedding_lookup(emb_generic, inputs_ids)
     emb_domain_batch = tf.nn.embedding_lookup(emb_domain, inputs_ids)
     #emb_domain_batch = tf.Print(emb_domain_batch,[emb_domain_batch[:5,:]], message="emb_domain_batch: ", first_n=3, summarize=100)
     emb_domain_batch = tf.multiply(emb_domain_batch, mask)
     emb_domain_batch = tf.Print(emb_domain_batch,[emb_domain_batch[:5,:]], message="emb_domain_batch: ", first_n=3, summarize=100)
-    #emb_generic_batch = gen_fusion_layer(emb_generic_batch)
-    #emb_domain_batch = dom_fusion_layer(emb_domain_batch)
     return tf.concat([emb_generic_batch, emb_domain_batch],-1)
 
 def extend_embeddings(vocab_size, dom_numb, old_emb):
@@ -416,23 +413,26 @@ class Model:
         with tf.variable_scope("src_generic_embedding"):
             src_emb_generic = create_embeddings(config["src_vocab_size"], depth=src_size_in_common)
         
-        with tf.variable_scope("src_domain_embedding", initializer = tf.zeros_initializer): #, regularizer=tf.contrib.layers.l2_regularizer):
-            src_emb_domain = create_embeddings(config["src_vocab_size"], depth=sum(src_size_in_domain))#size_src - src_size_in_common)
+        with tf.variable_scope("src_domain_embedding", initializer = tf.zeros_initializer): 
+            src_emb_domain = create_embeddings(config["src_vocab_size"], depth=sum(src_size_in_domain))
 
         self.src_emb_domain = src_emb_domain
         self.src_emb_generic = src_emb_generic
         
+        with tf.variable_scope("tgt_generic_embedding"):
+            tgt_emb_generic = create_embeddings(config["tgt_vocab_size"], depth=tgt_size_in_common)
+        
+        with tf.variable_scope("tgt_domain_embedding", initializer = tf.zeros_initializer): 
+            tgt_emb_domain = create_embeddings(config["tgt_vocab_size"], depth=sum(tgt_size_in_domain))
+
+        """
         with tf.variable_scope("tgt_embedding"):
             tgt_emb = create_embeddings(config["tgt_vocab_size"], depth=size_tgt)
+        """
 
         with tf.variable_scope("src_mask"):
             src_mask_ = create_mask(config["domain_numb"], src_size_in_domain)
             #src_mask_ = tf.Print(src_mask_, [src_mask_[:,:32]],message="src_mask: ", first_n=3, summarize=100)
-
-        with tf.variable_scope("src_generic_region_fusion_layer"):
-            src_gen_fusion_layer = build_output_layer(src_size_in_common, size_src, use_bias=False)
-        with tf.variable_scope("src_domain_region_fusion_layer"):
-            src_dom_fusion_layer = build_output_layer(sum(src_size_in_domain), size_src, use_bias=False)
 
         with tf.variable_scope("tgt_mask"):
             tgt_mask_ = create_mask(config["domain_numb"], tgt_size_in_domain)
@@ -472,7 +472,9 @@ class Model:
         emb_src_batch_generic = make_batch(src_emb_domain, src_emb_generic, src_mask_, generic_domain, inputs["src_ids"])                     
 
         if mode=="Training":
-            emb_tgt_batch = tf.nn.embedding_lookup(tgt_emb, inputs["tgt_ids_in"])    
+            emb_tgt_batch_domain = make_batch(tgt_emb_domain, tgt_emb_generic, tgt_mask_, inputs["domain"], inputs["tgt_ids"])
+            emb_tgt_batch_generic = make_batch(tgt_emb_domain, tgt_emb_generic, tgt_mask_, generic_domain, inputs["tgt_ids"])
+            #emb_tgt_batch = tf.nn.embedding_lookup(tgt_emb, inputs["tgt_ids_in"])    
      
         #output_layer = build_output_layer(hidden_size, config["tgt_vocab_size"])
         output_layer = None
@@ -499,7 +501,7 @@ class Model:
                 with tf.variable_scope("decoder", reuse=tf.AUTO_REUSE):                           
                     if config.get("Standard",True):                        
                         logits_generic, _, _ = decoder.decode(
-                                              emb_tgt_batch,
+                                              emb_tgt_batch_generic,
                                               tgt_length + 1,
                                               vocab_size = int(config["tgt_vocab_size"]),
                                               initial_state = encoder_output_generic[1],
@@ -509,7 +511,7 @@ class Model:
                                               memory_sequence_length = encoder_output_generic[2],
                                               return_alignment_history = False)
                         logits_domain, _, _ = decoder.decode(
-                                              emb_tgt_batch,
+                                              emb_tgt_batch_domain,
                                               tgt_length + 1,
                                               vocab_size = int(config["tgt_vocab_size"]),
                                               initial_state = encoder_output_domain[1],
@@ -531,11 +533,10 @@ class Model:
                 beam_width = config.get("beam_width", 5)
                 print("Inference with beam width %d"%(beam_width))
                 maximum_iterations = config.get("maximum_iterations", 250)
-                
                 if beam_width <= 1:
                     if config.get("Standard",True):
                         sampled_ids, _, sampled_length, log_probs, alignment = decoder.dynamic_decode(
-                                                                                    tgt_emb,
+                                                                                    lambda id: tf.concat([tf.nn.embedding_lookup(tgt_emb_generic, id), tf.multiply(tf.nn.embedding_lookup(tgt_emb_domain, id), tf.nn.embedding_lookup(tgt_mask_, id))],-1),
                                                                                     start_tokens,
                                                                                     end_token,
                                                                                     vocab_size=int(config["tgt_vocab_size"]),
@@ -551,7 +552,7 @@ class Model:
                     length_penalty = config.get("length_penalty", 0)
                     if config.get("Standard",True):
                         sampled_ids, _, sampled_length, log_probs, alignment = decoder.dynamic_decode_and_search(
-                                                          tgt_emb,
+                                                          lambda id: tf.concat([tf.nn.embedding_lookup(tgt_emb_generic, id), tf.multiply(tf.nn.embedding_lookup(tgt_emb_domain, id), tf.nn.embedding_lookup(tgt_mask_, id))],-1),
                                                           start_tokens,
                                                           end_token,
                                                           vocab_size = int(config["tgt_vocab_size"]),
