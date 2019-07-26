@@ -474,8 +474,8 @@ class Model:
         emb_src_batch_generic = make_batch(src_emb_domain, src_emb_generic, src_mask_, generic_domain, inputs["src_ids"])                     
 
         if mode=="Training":
-            emb_tgt_batch_domain = make_batch(tgt_emb_domain, tgt_emb_generic, tgt_mask_, inputs["domain"], inputs["tgt_ids"])
-            emb_tgt_batch_generic = make_batch(tgt_emb_domain, tgt_emb_generic, tgt_mask_, generic_domain, inputs["tgt_ids"])
+            emb_tgt_batch_domain = make_batch(tgt_emb_domain, tgt_emb_generic, tgt_mask_, inputs["domain"], inputs["tgt_ids_in"])
+            emb_tgt_batch_generic = make_batch(tgt_emb_domain, tgt_emb_generic, tgt_mask_, generic_domain, inputs["tgt_ids_in"])
             #emb_tgt_batch = tf.nn.embedding_lookup(tgt_emb, inputs["tgt_ids_in"])    
      
         #output_layer = build_output_layer(hidden_size, config["tgt_vocab_size"])
@@ -530,7 +530,7 @@ class Model:
             outputs = None            
 
         if mode != "Training":  
-                
+            domain_ = inputs["domain"][0]
             with tf.variable_scope("decoder"):        
                 beam_width = config.get("beam_width", 5)
                 print("Inference with beam width %d"%(beam_width))
@@ -538,7 +538,7 @@ class Model:
                 if beam_width <= 1:
                     if config.get("Standard",True):
                         sampled_ids, _, sampled_length, log_probs, alignment = decoder.dynamic_decode(
-                                                                                    lambda id: tf.concat([tf.nn.embedding_lookup(tgt_emb_generic, id), tf.multiply(tf.nn.embedding_lookup(tgt_emb_domain, id), tf.nn.embedding_lookup(tgt_mask_, id))],-1),
+                                                                                    lambda id: tf.concat([tf.nn.embedding_lookup(tgt_emb_generic, id), tf.multiply(tf.nn.embedding_lookup(tgt_emb_domain, id), tf.nn.embedding_lookup(tgt_mask_, domain_))],-1),
                                                                                     start_tokens,
                                                                                     end_token,
                                                                                     vocab_size=int(config["tgt_vocab_size"]),
