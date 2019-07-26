@@ -415,7 +415,7 @@ class Model:
         with tf.variable_scope("src_generic_embedding"):
             src_emb_generic = create_embeddings(config["src_vocab_size"], depth=src_size_in_common)
         
-        with tf.variable_scope("src_domain_embedding", initializer = tf.zeros_initializer): 
+        with tf.variable_scope("src_ldr_embedding", initializer = tf.zeros_initializer): 
             src_emb_domain = create_embeddings(config["src_vocab_size"], depth=sum(src_size_in_domain))
 
         self.src_emb_domain = src_emb_domain
@@ -424,7 +424,7 @@ class Model:
         with tf.variable_scope("tgt_generic_embedding"):
             tgt_emb_generic = create_embeddings(config["tgt_vocab_size"], depth=tgt_size_in_common)
         
-        with tf.variable_scope("tgt_domain_embedding", initializer = tf.zeros_initializer): 
+        with tf.variable_scope("tgt_ldr_embedding", initializer = tf.zeros_initializer): 
             tgt_emb_domain = create_embeddings(config["tgt_vocab_size"], depth=sum(tgt_size_in_domain))
 
         """
