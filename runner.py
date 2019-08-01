@@ -47,7 +47,15 @@ if config["mode"] == "Training":
 
         elif config["generic+domain_training"]:
             print("generic+domain_training")
-            train_op, accum_vars_ = optimize_loss((loss_domain + loss_generic)/2, config["optimizer_parameters"])
+            inputs = training_model.inputs_()
+            domain = inputs["domain"][0]
+            data_sizes = [get_dataset_size(path) for path in config["training_feature_file"]]
+            total_size = sum(data_sizes)
+            domain_weight = tf.constant([float(s)/(total_size) for s in data_sizes])
+            if config.get("domain_weighted_loss", False):
+                train_op, accum_vars_ = optimize_loss(loss_domain + loss_generic * domain_weight[domain], config["optimizer_parameters"])
+            else:
+                train_op, accum_vars_ = optimize_loss(loss_domain * 0.5 + loss_generic * 0.5, config["optimizer_parameters"])
 
         elif config["generic_training"]:
             print("generic_training")
@@ -126,6 +134,7 @@ with tf.Session(config=tf.ConfigProto(log_device_placement=False, allow_soft_pla
     src_lengths = []
     tgt_lengths = []
     #loop_count = 0
+    
     while global_step_ <= config["iteration_number"]:                       
         #loop_count +=1
         if isinstance(train_op,list):

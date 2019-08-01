@@ -305,7 +305,7 @@ class Model:
             iterator = load_data(config["training_label_file"], src_vocab, config["training_tag_file"], batch_size = train_batch_size, batch_type=config["training_batch_type"], batch_multiplier = batch_multiplier, tgt_path=config["training_feature_file"], tgt_vocab=tgt_vocab, max_len = max_len, mode=mode, shuffle_buffer_size = config["sample_buffer_size"], num_threads = num_threads, version = load_data_version, distribution = example_sampling_distribution)
             inputs = iterator.get_next()            
             data_shards = dispatcher.shard(inputs)
-
+            
             with tf.variable_scope(config["Architecture"], initializer=self._initializer(config)):
                 losses_shards = dispatcher(_loss_op, data_shards, config, mode)
 
