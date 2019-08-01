@@ -34,23 +34,32 @@ global_step = tf.train.create_global_step()
 if config.get("Loss_Function","Cross_Entropy")=="Cross_Entropy":
     loss_generic, loss_domain = training_model.loss_()
 
-"""
 if config["mode"] == "Training":
     if config.get("Loss_Function","Cross_Entropy")=="Cross_Entropy":
-        if config["generic_batch"]:
+        if config["generic_domain_training"]:
+            print("generic_domain_training")
             with tf.variable_scope("domain_optim"):
-                domain_op, domain_accum_vars_ = optimize_loss(loss_domain, config["optimizer_parameters"], var_list=[v for v in tf.trainable_variables() if "domain" in v.name], update_global_step=False)
-
+                domain_op, domain_accum_vars_ = optimize_loss(loss_domain, config["optimizer_parameters"], var_list=[v for v in tf.trainable_variables() if "ldr" in v.name], update_global_step=False)
             with tf.variable_scope("generic_optim"):
-                gen_op, gen_accum_vars_ = optimize_loss(loss_generic, config["optimizer_parameters"], var_list=[v for v in tf.trainable_variables() if "domain" not in v.name])
-        else:
+                gen_op, gen_accum_vars_ = optimize_loss(loss_generic, config["optimizer_parameters"], var_list=[v for v in tf.trainable_variables() if "ldr" not in v.name])
+            train_op = [domain_op, gen_op]
+            accum_vars_ = domain_accum_vars_ + gen_accum_vars_
+
+        elif config["generic+domain_training"]:
+            print("generic+domain_training")
+            train_op, accum_vars_ = optimize_loss((loss_domain + loss_generic)/2, config["optimizer_parameters"])
+
+        elif config["generic_training"]:
+            print("generic_training")
             train_op, accum_vars_ = optimize_loss(loss_generic, config["optimizer_parameters"])
+
+        elif config["domain_training"]:
+            print("domain_training")
+            train_op, accum_vars_ = optimize_loss(loss_domain, config["optimizer_parameters"])
         
-        #train_op, accum_vars_ = optimize_loss((loss_domain + loss_generic)/2, config["optimizer_parameters"])
 elif config["mode"] == "continual":
-    train_op, accum_vars_ = optimize_loss((loss_domain + loss_generic)/2, config["optimizer_parameters"]) #optimize_loss(loss_domain, config["optimizer_parameters"], var_list=[v for v in tf.trainable_variables() if "domain" in v.name])        
-"""
-train_op, accum_vars_ = optimize_loss((loss_domain + loss_generic)/2, config["optimizer_parameters"])
+    train_op, accum_vars_ = optimize_loss(loss_domain, config["optimizer_parameters"], var_list=[v for v in tf.trainable_variables() if "ldr" in v.name]) #optimize_loss((loss_domain + loss_generic)/2, config["optimizer_parameters"]) #optimize_loss(loss_domain, config["optimizer_parameters"], var_list=[v for v in tf.trainable_variables() if "domain" in v.name])        
+
 Eval_dataset_numb = len(config["eval_label_file"])
 print("Number of validation set: ", Eval_dataset_numb)
 external_evaluator = [None] * Eval_dataset_numb 
@@ -74,13 +83,6 @@ with tf.Session(config=tf.ConfigProto(log_device_placement=False, allow_soft_pla
     checkpoint_path = tf.train.latest_checkpoint(config["model_dir"])
         
     sess.run([v.initializer for v in var_list_])    
-    """
-    if config["generic_batch"]:
-        sess.run([v.initializer for v in domain_accum_vars_])
-        sess.run([v.initializer for v in gen_accum_vars_])
-    else:
-        sess.run([v.initializer for v in accum_vars_])
-    """
     sess.run([v.initializer for v in accum_vars_])
     training_summary = tf.summary.merge_all()
     global_step_ = sess.run(global_step) 
@@ -96,6 +98,7 @@ with tf.Session(config=tf.ConfigProto(log_device_placement=False, allow_soft_pla
             prediction_file = inference(config_file, checkpoint_path, config["eval_feature_file"][i], config["eval_tag_file"][i])
             score = external_evaluator[i].score(config["eval_label_file"][i], prediction_file)
             print("BLEU at checkpoint %s for testset %s: %f"%(checkpoint_path, config["eval_feature_file"][i], score))            
+        
     elif config["mode"] == "continual":
         print("New domain continual training:...")
         checkpoint_path_ = config.get("checkpoint_path")
@@ -122,17 +125,14 @@ with tf.Session(config=tf.ConfigProto(log_device_placement=False, allow_soft_pla
     total_loss_domain = []
     src_lengths = []
     tgt_lengths = []
-    
+    #loop_count = 0
     while global_step_ <= config["iteration_number"]:                       
-        #for i in range(3):
-        #    loss_domain_, _ = sess.run([loss_domain, domain_op])
-        """
-        if config["generic_batch"]:
-            loss_domain_, loss_generic_, global_step_, _, _ = sess.run([loss_domain, loss_generic, global_step, domain_op, gen_op])       
+        #loop_count +=1
+        if isinstance(train_op,list):
+            loss_domain_, loss_generic_, global_step_, _, _ = sess.run([loss_domain, loss_generic, global_step]+train_op)        
         else:
             loss_domain_, loss_generic_, global_step_, _ = sess.run([loss_domain, loss_generic, global_step, train_op])
-        """
-        loss_domain_, loss_generic_, global_step_, _ = sess.run([loss_domain, loss_generic, global_step, train_op])        
+
         total_loss_generic.append(loss_generic_)
         total_loss_domain.append(loss_domain_)
         
@@ -140,14 +140,14 @@ with tf.Session(config=tf.ConfigProto(log_device_placement=False, allow_soft_pla
             print((datetime.datetime.now()))
             print(("Loss generic at step %d"%(global_step_), np.mean(total_loss_generic)))                
             print(("Loss domain at step %d"%(global_step_), np.mean(total_loss_domain)))
-            
+            total_loss_generic = []
+            total_loss_domain = []
+  
         if (np.mod(global_step_, config["summary_freq"])) == 0:
             training_summary_ = sess.run(training_summary)
             writer.add_summary(training_summary_, global_step=global_step_)
             writer.flush()
-            total_loss_generic = []
-            total_loss_domain = []
-            
+                     
         if (np.mod(global_step_, config["save_freq"])) == 0 and global_step_ > 0:    
             print((datetime.datetime.now()))
             checkpoint_path = os.path.join(config["model_dir"], 'model.ckpt')

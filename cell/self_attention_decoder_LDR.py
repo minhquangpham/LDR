@@ -6,6 +6,18 @@ from opennmt.decoders import decoder
 from opennmt.layers import transformer
 from opennmt.layers.position import SinusoidalPositionEncoder
 
+def transform(inputs, ldr_inputs, name="ldr_bias",type="bias"):
+    num_units = int(inputs.get_shape()[-1])
+    if type=="bias":
+        ldr = tf.layers.dense(ldr_inputs, num_units, name=name, use_bias=False)
+        ldr = tf.Print(ldr, [tf.reduce_max(tf.abs(ldr))], message=name+"_bias :", first_n=3, summarize=100)
+        return inputs + ldr
+    elif type=="scale_bias":
+        ldr_bias = tf.layers.dense(ldr_inputs, num_units, name=name+"_bias", use_bias=False)
+        ldr_scale = tf.layers.dense(ldr_inputs, num_units, name=name+"_scale", use_bias=False, activation=tf.keras.activations.exponential)
+        ldr_bias = tf.Print(ldr_bias, [tf.reduce_max(tf.abs(ldr_bias))], message=name+"_bias :", first_n=3, summarize=100)
+        ldr_bias = tf.Print(ldr_scale, [tf.reduce_max(tf.abs(ldr_scale))], message="_scale :"%l, first_n=3, summarize=100)
+        return tf.multiply(inputs + ldr_bias, ldr_scale)
 
 class SelfAttentionDecoder(decoder.Decoder):
   
@@ -18,7 +30,8 @@ class SelfAttentionDecoder(decoder.Decoder):
                attention_dropout=0.1,
                relu_dropout=0.1,
                position_encoder=SinusoidalPositionEncoder(),
-               self_attention_type="scaled_dot"):
+               self_attention_type="scaled_dot",
+               ldr_attention_type="bias"):
     """Initializes the parameters of the decoder.
 
     Args:
@@ -48,6 +61,7 @@ class SelfAttentionDecoder(decoder.Decoder):
     self.relu_dropout = relu_dropout
     self.position_encoder = position_encoder
     self.self_attention_type = self_attention_type.lower()
+    self.ldr_attention_type = ldr_attention_type
     if self.self_attention_type not in ("scaled_dot", "average"):
       raise ValueError("invalid attention type %s" % self.self_attention_type)
     if self.self_attention_type == "average":
@@ -105,9 +119,14 @@ class SelfAttentionDecoder(decoder.Decoder):
         inputs,
         rate=self.dropout,
         training=mode == tf.estimator.ModeKeys.TRAIN)
-
-    inputs = inputs + tf.layers.dense(ldr_inputs, self.num_units, name="ldr_layer_0")
-
+    ldr_inputs = tf.Print(ldr_inputs, [tf.reduce_mean(ldr_inputs)], message="ldr_decoder_input: ", first_n=3, summarize=100)
+    """
+    ldr = tf.layers.dense(ldr_inputs, self.num_units, name="ldr_layer_0", use_bias=False)
+    ldr = tf.Print(ldr, [tf.reduce_max(tf.abs(ldr))], message="ldr_decoder_layer_0: ", first_n=3, summarize=100)
+    inputs = inputs + ldr
+    """
+    inputs = transform(inputs, ldr_inputs, name="ldr_layer_0", type=self.ldr_attention_type)    
+    
     decoder_mask = None
     memory_mask = None
     last_attention = None
@@ -204,8 +223,8 @@ class SelfAttentionDecoder(decoder.Decoder):
               mode,
               dropout=self.dropout)
 
-        inputs = transformed
-        inputs = inputs + tf.layers.dense(ldr_inputs, self.num_units, name="ldr_layer_%d"%l)
+        inputs = transformed        
+        inputs = transform(inputs,ldr_inputs,name="ldr_layer_%d"%l,type=self.ldr_attention_type)
 
     if last_attention is not None:
       # The first head of the last layer is returned.

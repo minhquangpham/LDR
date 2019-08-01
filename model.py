@@ -116,8 +116,7 @@ class MyDenseLayer(Layer):
         output_shape = shape[:-1] + [self.units]
         outputs.set_shape(output_shape)
     else:
-      outputs = gen_math_ops.mat_mul(inputs, kernel)    
-    
+      outputs = gen_math_ops.mat_mul(inputs, kernel)        
     if self.use_bias:
       outputs = nn.bias_add(outputs, self.bias)
     if self.activation is not None:
@@ -201,22 +200,26 @@ class Model:
         else:
             mode = tf.estimator.ModeKeys.EVAL            
           
-        logits_generic, logits_domain = outputs["logits"]
+        logits_generic, logits_domain = outputs["logits"] 
+
         with tf.variable_scope("loss", reuse=tf.AUTO_REUSE):
-            loss_generic, loss_normalizer, loss_token_normalizer = cross_entropy_sequence_loss(logits_generic,
+            print_op = tf.print("logits_generic_domain_diff: ", tf.norm(logits_generic-logits_domain))
+            with tf.control_dependencies([print_op]):
+                loss_generic, loss_normalizer, loss_token_normalizer = cross_entropy_sequence_loss(logits_generic,
                                                                                    tgt_ids_batch, 
                                                                                    tgt_length + 1,
                                                                                    label_smoothing=params.get("label_smoothing", 0.0),
                                                                                    average_in_time=params.get("average_loss_in_time", True),
                                                                                    mode=mode)
-            print("logits_generic", logits_generic)
-            print("tgt_ids_batch", tgt_ids_batch)
-            loss_domain, _, _                                    = cross_entropy_sequence_loss(logits_domain,
+
+                loss_domain, _, _                                    = cross_entropy_sequence_loss(logits_domain,
                                                                                    tgt_ids_batch, 
                                                                                    tgt_length + 1,
                                                                                    label_smoothing=params.get("label_smoothing", 0.0),
                                                                                    average_in_time=params.get("average_loss_in_time", True),
                                                                                    mode=mode)
+
+                
         return loss_generic, loss_domain, loss_normalizer, loss_token_normalizer
 
     def _initializer(self, params):        
@@ -349,13 +352,7 @@ class Model:
         return self.predictions
         
     def inputs_(self):
-        return self.inputs
-    
-    def Wasserstein_batch_info(self):
-        if self.Loss_type == "Wasserstein":
-            return self.cost_sample_batch, self.cost_batch, self.tf_idf_batch, self.tf_idf_sample_batch, self.sample_log_prob
-        else:
-            return None, None, None, None, None
+        return self.inputs    
 
     def iterator_initializers(self):
         if isinstance(self.iterator,list):
@@ -365,8 +362,6 @@ class Model:
            
     def _build(self, inputs, config, mode):        
 
-        debugging = config.get("debugging", False)
-        projector_masking = config.get("projector_masking", False)
         src_masking = config.get("src_masking", True)        
         tgt_masking = config.get("tgt_masking", False)
         adv_training = config.get("Generic_region_adversarial_training", False)
@@ -376,13 +371,9 @@ class Model:
         Loss_type = self.Loss_type
         self.adv_training = adv_training
         self.src_adv_training = src_adv_training
-        self.tgt_adv_training = tgt_adv_training
-        self.Adv_var = []
-        print("projector_masking", projector_masking)
-        print("src_masking", src_masking)
-        print("tgt_masking", tgt_masking)
-        print("Adv_training", adv_training)        
-        print("Loss_type: ", Loss_type)
+        self.tgt_adv_training = tgt_adv_training        
+        
+        ######
         src_size_in_common = config["src_sharing_embedding_region_size"]
         src_size_in_domain = config["src_domain_embedding_region_size"]
         tgt_size_in_common = config.get("tgt_sharing_embedding_region_size", config["src_sharing_embedding_region_size"])
@@ -427,14 +418,8 @@ class Model:
         with tf.variable_scope("tgt_ldr_embedding", initializer = tf.zeros_initializer): 
             tgt_emb_domain = create_embeddings(config["tgt_vocab_size"], depth=sum(tgt_size_in_domain))
 
-        """
-        with tf.variable_scope("tgt_embedding"):
-            tgt_emb = create_embeddings(config["tgt_vocab_size"], depth=size_tgt)
-        """
-
         with tf.variable_scope("src_mask"):
             src_mask_ = create_mask(config["domain_numb"], src_size_in_domain)
-            #src_mask_ = tf.Print(src_mask_, [src_mask_[:,:32]],message="src_mask: ", first_n=3, summarize=100)
 
         with tf.variable_scope("tgt_mask"):
             tgt_mask_ = create_mask(config["domain_numb"], tgt_size_in_domain)
@@ -458,8 +443,8 @@ class Model:
 
         elif config["Architecture"] == "Transformer":
             nlayers = config.get("nlayers",6)
-            decoder = self_attention_decoder_LDR.SelfAttentionDecoder(nlayers, num_units=hidden_size, num_heads=8, ffn_inner_dim=2048, dropout=0.1, attention_dropout=0.1, relu_dropout=0.1)
-            encoder = self_attention_encoder_LDR.SelfAttentionEncoder(nlayers, num_units=hidden_size, num_heads=8, ffn_inner_dim=2048, dropout=0.1, attention_dropout=0.1, relu_dropout=0.1)
+            decoder = self_attention_decoder_LDR.SelfAttentionDecoder(nlayers, num_units=hidden_size, num_heads=8, ffn_inner_dim=2048, dropout=0.1, attention_dropout=0.1, relu_dropout=0.1, ldr_attention_type=config.get("encoder_ldr_attention_type","bias"))
+            encoder = self_attention_encoder_LDR.SelfAttentionEncoder(nlayers, num_units=hidden_size, num_heads=8, ffn_inner_dim=2048, dropout=0.1, attention_dropout=0.1, relu_dropout=0.1, ldr_attention_type=config.get("decoder_ldr_attention_type","bias"))
 
         print("Model type: ", config["Architecture"])
 
@@ -472,13 +457,11 @@ class Model:
         generic_domain = tf.fill(tf.shape(inputs["domain"]), config["domain_numb"])
         emb_src_batch_domain = make_batch(src_emb_domain, src_emb_generic, src_mask_, inputs["domain"], inputs["src_ids"])
         emb_src_batch_generic = make_batch(src_emb_domain, src_emb_generic, src_mask_, generic_domain, inputs["src_ids"])                     
-
+            
         if mode=="Training":
             emb_tgt_batch_domain = make_batch(tgt_emb_domain, tgt_emb_generic, tgt_mask_, inputs["domain"], inputs["tgt_ids_in"])
             emb_tgt_batch_generic = make_batch(tgt_emb_domain, tgt_emb_generic, tgt_mask_, generic_domain, inputs["tgt_ids_in"])
-            #emb_tgt_batch = tf.nn.embedding_lookup(tgt_emb, inputs["tgt_ids_in"])    
-     
-        #output_layer = build_output_layer(hidden_size, config["tgt_vocab_size"])
+
         output_layer = None
         if config["Architecture"] != "Transformer":
             output_layer = build_output_layer(int(hidden_size)+int(size_tgt), config["tgt_vocab_size"])
@@ -489,20 +472,25 @@ class Model:
         if mode =="Training":
             tgt_ids_batch = inputs["tgt_ids_out"]
             tgt_length = inputs["tgt_length"]
-            
-        with tf.variable_scope("encoder", reuse=tf.AUTO_REUSE):
-            if config.get("Standard",True):
-                if mode=="Training":
-                    encoder_output_generic = encoder.encode(emb_src_batch_generic, sequence_length = src_length, mode=tf.estimator.ModeKeys.TRAIN)
-                    encoder_output_domain = encoder.encode(emb_src_batch_domain, sequence_length = src_length, mode=tf.estimator.ModeKeys.TRAIN)
-                else:
-                    encoder_output = encoder.encode(emb_src_batch_domain, sequence_length = src_length, mode=tf.estimator.ModeKeys.PREDICT)           
+
+        print_op = tf.print("src_batch_domain_generic_diff: ", tf.norm(emb_src_batch_domain - emb_src_batch_generic))
+        with tf.control_dependencies([print_op]):    
+            with tf.variable_scope("encoder", reuse=tf.AUTO_REUSE):
+                if config.get("Standard",True):
+                    if mode=="Training":
+                        encoder_output_generic = encoder.encode(emb_src_batch_generic, sequence_length = src_length, mode=tf.estimator.ModeKeys.TRAIN)
+                        encoder_output_domain = encoder.encode(emb_src_batch_domain, sequence_length = src_length, mode=tf.estimator.ModeKeys.TRAIN)
+                    else:
+                        encoder_output = encoder.encode(emb_src_batch_domain, sequence_length = src_length, mode=tf.estimator.ModeKeys.PREDICT)           
                     
         if mode == "Training":    
             if Loss_type == "Cross_Entropy":
                 with tf.variable_scope("decoder", reuse=tf.AUTO_REUSE):                           
-                    if config.get("Standard",True):                        
-                        logits_generic, _, _ = decoder.decode(
+                    print_op_1 = tf.print("tgt_batch_domain_generic_diff: ", tf.norm(emb_tgt_batch_domain - emb_tgt_batch_generic))
+                    print_op_2 = tf.print("encoder_output_domain_generic_diff: ", tf.norm(encoder_output_generic[0] - encoder_output_domain[0]))
+                    with tf.control_dependencies([print_op_1, print_op_2]):
+                        if config.get("Standard",True):                        
+                            logits_generic, _, _ = decoder.decode(
                                               emb_tgt_batch_generic,
                                               tgt_length + 1,
                                               vocab_size = int(config["tgt_vocab_size"]),
@@ -512,7 +500,8 @@ class Model:
                                               memory = encoder_output_generic[0],
                                               memory_sequence_length = encoder_output_generic[2],
                                               return_alignment_history = False)
-                        logits_domain, _, _ = decoder.decode(
+
+                            logits_domain, _, _ = decoder.decode(
                                               emb_tgt_batch_domain,
                                               tgt_length + 1,
                                               vocab_size = int(config["tgt_vocab_size"]),
@@ -554,7 +543,7 @@ class Model:
                     length_penalty = config.get("length_penalty", 0)
                     if config.get("Standard",True):
                         sampled_ids, _, sampled_length, log_probs, alignment = decoder.dynamic_decode_and_search(
-                                                          lambda id: tf.concat([tf.nn.embedding_lookup(tgt_emb_generic, id), tf.multiply(tf.nn.embedding_lookup(tgt_emb_domain, id), tf.nn.embedding_lookup(tgt_mask_, id))],-1),
+                                                          lambda id: tf.concat([tf.nn.embedding_lookup(tgt_emb_generic, id), tf.multiply(tf.nn.embedding_lookup(tgt_emb_domain, id), tf.nn.embedding_lookup(tgt_mask_, domain_))],-1),
                                                           start_tokens,
                                                           end_token,
                                                           vocab_size = int(config["tgt_vocab_size"]),
