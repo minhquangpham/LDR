@@ -203,21 +203,20 @@ class Model:
         logits_generic, logits_domain = outputs["logits"] 
 
         with tf.variable_scope("loss", reuse=tf.AUTO_REUSE):
-            print_op = tf.print("logits_generic_domain_diff: ", tf.norm(logits_generic-logits_domain))
-            with tf.control_dependencies([print_op]):
-                loss_generic, loss_normalizer, loss_token_normalizer = cross_entropy_sequence_loss(logits_generic,
-                                                                                   tgt_ids_batch, 
-                                                                                   tgt_length + 1,
-                                                                                   label_smoothing=params.get("label_smoothing", 0.0),
-                                                                                   average_in_time=params.get("average_loss_in_time", True),
-                                                                                   mode=mode)
+       
+            loss_generic, loss_normalizer, loss_token_normalizer = cross_entropy_sequence_loss(logits_generic,
+                                                                                tgt_ids_batch, 
+                                                                                tgt_length + 1,
+                                                                                label_smoothing=params.get("label_smoothing", 0.0),
+                                                                                average_in_time=params.get("average_loss_in_time", True),
+                                                                                mode=mode)
 
-                loss_domain, _, _                                    = cross_entropy_sequence_loss(logits_domain,
-                                                                                   tgt_ids_batch, 
-                                                                                   tgt_length + 1,
-                                                                                   label_smoothing=params.get("label_smoothing", 0.0),
-                                                                                   average_in_time=params.get("average_loss_in_time", True),
-                                                                                   mode=mode)
+            loss_domain, _, _                                    = cross_entropy_sequence_loss(logits_domain,
+                                                                                tgt_ids_batch, 
+                                                                                tgt_length + 1,
+                                                                                label_smoothing=params.get("label_smoothing", 0.0),
+                                                                                average_in_time=params.get("average_loss_in_time", True),
+                                                                                mode=mode)
 
                 
         return loss_generic, loss_domain, loss_normalizer, loss_token_normalizer
