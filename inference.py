@@ -10,7 +10,6 @@ from opennmt.utils.losses import cross_entropy_sequence_loss
 from opennmt.utils.evaluator import *
 from model import *
 import os
-import ipdb
 import yaml
 import io
 parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
