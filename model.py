@@ -182,7 +182,7 @@ def make_batch(emb_domain, emb_generic, mask_, inputs_domain, inputs_ids):
     emb_domain_batch = tf.nn.embedding_lookup(emb_domain, inputs_ids)
     #emb_domain_batch = tf.Print(emb_domain_batch,[emb_domain_batch[:5,:]], message="emb_domain_batch: ", first_n=3, summarize=100)
     emb_domain_batch = tf.multiply(emb_domain_batch, mask)
-    emb_domain_batch = tf.Print(emb_domain_batch,[emb_domain_batch[:5,:]], message="emb_domain_batch: ", first_n=3, summarize=100)
+    #emb_domain_batch = tf.Print(emb_domain_batch,[emb_domain_batch[:5,:]], message="emb_domain_batch: ", first_n=3, summarize=100)
     return tf.concat([emb_generic_batch, emb_domain_batch],-1)
 
 def extend_embeddings(vocab_size, dom_numb, old_emb):
@@ -472,16 +472,15 @@ class Model:
             tgt_ids_batch = inputs["tgt_ids_out"]
             tgt_length = inputs["tgt_length"]
 
-        print_op = tf.print("src_batch_domain_generic_diff: ", tf.norm(emb_src_batch_domain - emb_src_batch_generic))
-        with tf.control_dependencies([print_op]):    
-            with tf.variable_scope("encoder", reuse=tf.AUTO_REUSE):
-                if config.get("Standard",True):
-                    if mode=="Training":
-                        encoder_output_generic = encoder.encode(emb_src_batch_generic, sequence_length = src_length, mode=tf.estimator.ModeKeys.TRAIN)
-                        encoder_output_domain = encoder.encode(emb_src_batch_domain, sequence_length = src_length, mode=tf.estimator.ModeKeys.TRAIN)
-                    else:
-                        encoder_output = encoder.encode(emb_src_batch_domain, sequence_length = src_length, mode=tf.estimator.ModeKeys.PREDICT)           
-                    
+         
+        with tf.variable_scope("encoder", reuse=tf.AUTO_REUSE):
+            if config.get("Standard",True):
+                if mode=="Training":
+                    encoder_output_generic = encoder.encode(emb_src_batch_generic, sequence_length = src_length, mode=tf.estimator.ModeKeys.TRAIN)
+                    encoder_output_domain = encoder.encode(emb_src_batch_domain, sequence_length = src_length, mode=tf.estimator.ModeKeys.TRAIN)
+                else:
+                    encoder_output = encoder.encode(emb_src_batch_domain, sequence_length = src_length, mode=tf.estimator.ModeKeys.PREDICT)           
+                
         if mode == "Training":    
             if Loss_type == "Cross_Entropy":
                 with tf.variable_scope("decoder", reuse=tf.AUTO_REUSE):                           
