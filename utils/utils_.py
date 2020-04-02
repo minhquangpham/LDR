@@ -9,7 +9,6 @@ from opennmt.utils.losses import cross_entropy_sequence_loss
 from opennmt.utils.evaluator import *
 import model 
 import os
-import ipdb
 import yaml
 import io
 import sklearn.metrics as sk
