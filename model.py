@@ -486,31 +486,31 @@ class Model:
         if mode == "Training":    
             if Loss_type == "Cross_Entropy":
                 with tf.variable_scope("decoder", reuse=tf.AUTO_REUSE):                           
-                    print_op_1 = tf.print("tgt_batch_domain_generic_diff: ", tf.norm(emb_tgt_batch_domain - emb_tgt_batch_generic))
-                    print_op_2 = tf.print("encoder_output_domain_generic_diff: ", tf.norm(encoder_output_generic[0] - encoder_output_domain[0]))
-                    with tf.control_dependencies([print_op_1, print_op_2]):
-                        if config.get("Standard",True):                        
-                            logits_generic, _, _ = decoder.decode(
-                                              emb_tgt_batch_generic,
-                                              tgt_length + 1,
-                                              vocab_size = int(config["tgt_vocab_size"]),
-                                              initial_state = encoder_output_generic[1],
-                                              output_layer = output_layer,
-                                              mode = tf.estimator.ModeKeys.TRAIN,
-                                              memory = encoder_output_generic[0],
-                                              memory_sequence_length = encoder_output_generic[2],
-                                              return_alignment_history = False)
+                    #print_op_1 = tf.print("tgt_batch_domain_generic_diff: ", tf.norm(emb_tgt_batch_domain - emb_tgt_batch_generic))
+                    #print_op_2 = tf.print("encoder_output_domain_generic_diff: ", tf.norm(encoder_output_generic[0] - encoder_output_domain[0]))
+                    #with tf.control_dependencies([print_op_1, print_op_2]):
+                    if config.get("Standard",True):                        
+                        logits_generic, _, _ = decoder.decode(
+                                            emb_tgt_batch_generic,
+                                            tgt_length + 1,
+                                            vocab_size = int(config["tgt_vocab_size"]),
+                                            initial_state = encoder_output_generic[1],
+                                            output_layer = output_layer,
+                                            mode = tf.estimator.ModeKeys.TRAIN,
+                                            memory = encoder_output_generic[0],
+                                            memory_sequence_length = encoder_output_generic[2],
+                                            return_alignment_history = False)
 
-                            logits_domain, _, _ = decoder.decode(
-                                              emb_tgt_batch_domain,
-                                              tgt_length + 1,
-                                              vocab_size = int(config["tgt_vocab_size"]),
-                                              initial_state = encoder_output_domain[1],
-                                              output_layer = output_layer,
-                                              mode = tf.estimator.ModeKeys.TRAIN,
-                                              memory = encoder_output_domain[0],
-                                              memory_sequence_length = encoder_output_domain[2],
-                                              return_alignment_history = False)
+                        logits_domain, _, _ = decoder.decode(
+                                            emb_tgt_batch_domain,
+                                            tgt_length + 1,
+                                            vocab_size = int(config["tgt_vocab_size"]),
+                                            initial_state = encoder_output_domain[1],
+                                            output_layer = output_layer,
+                                            mode = tf.estimator.ModeKeys.TRAIN,
+                                            memory = encoder_output_domain[0],
+                                            memory_sequence_length = encoder_output_domain[2],
+                                            return_alignment_history = False)
                     outputs = {
                            "logits": (logits_generic, logits_domain)
                            }
