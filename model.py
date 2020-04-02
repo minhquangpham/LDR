@@ -12,7 +12,6 @@ from opennmt.utils.evaluator import *
 from opennmt.utils.parallel import GraphDispatcher
 from opennmt import constants
 import os
-import ipdb
 import copy
 import yaml
 import io
