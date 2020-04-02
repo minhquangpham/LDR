@@ -11,7 +11,6 @@ import model
 import os
 import yaml
 import io
-import sklearn.metrics as sk
 np.set_printoptions(threshold=sys.maxsize)
 
 def inference(config_file, checkpoint_path=None, test_feature_file=None, test_tag_file=None):
